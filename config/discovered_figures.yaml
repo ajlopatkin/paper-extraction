@@ -1,0 +1,191 @@
+figures:
+  - id: p001_fig01
+    page: 1
+    plot_type: box_plot
+    bbox_pdf: [36.16, 33.84, 166.63, 78.13]
+    render_dpi: 200
+  - id: p001_fig02
+    page: 1
+    plot_type: box_plot
+    bbox_pdf: [382.16, 557.79, 549.87, 743.48]
+    render_dpi: 200
+  - id: p004_fig01
+    page: 4
+    plot_type: box_plot
+    bbox_pdf: [109.10, 66.93, 304.72, 249.13]
+    render_dpi: 200
+  - id: p004_fig02
+    page: 4
+    plot_type: box_plot
+    bbox_pdf: [65.51, 247.58, 346.12, 379.74]
+    render_dpi: 200
+  - id: p007_fig01
+    page: 7
+    plot_type: box_plot
+    bbox_pdf: [41.69, 82.92, 363.14, 154.57]
+    render_dpi: 200
+  - id: p007_fig02
+    page: 7
+    plot_type: box_plot
+    bbox_pdf: [39.20, 154.03, 223.05, 434.45]
+    render_dpi: 200
+  - id: p007_fig03
+    page: 7
+    plot_type: box_plot
+    bbox_pdf: [263.58, 161.17, 374.18, 371.16]
+    render_dpi: 200
+  - id: p007_fig04
+    page: 7
+    plot_type: box_plot
+    bbox_pdf: [204.74, 167.94, 262.23, 275.90]
+    render_dpi: 200
+  - id: p007_fig05
+    page: 7
+    plot_type: box_plot
+    bbox_pdf: [38.95, 434.25, 269.15, 504.09]
+    render_dpi: 200
+  - id: p008_fig01
+    page: 8
+    plot_type: box_plot
+    bbox_pdf: [115.35, 72.38, 302.18, 202.55]
+    render_dpi: 200
+  - id: p008_fig02
+    page: 8
+    plot_type: box_plot
+    bbox_pdf: [115.28, 208.27, 302.18, 338.44]
+    render_dpi: 200
+  - id: p008_fig03
+    page: 8
+    plot_type: box_plot
+    bbox_pdf: [116.49, 567.83, 250.79, 664.18]
+    render_dpi: 200
+  - id: p009_fig01
+    page: 9
+    plot_type: box_plot
+    bbox_pdf: [92.51, 66.32, 169.26, 156.89]
+    render_dpi: 200
+  - id: p009_fig02
+    page: 9
+    plot_type: box_plot
+    bbox_pdf: [95.40, 170.79, 205.60, 269.94]
+    render_dpi: 200
+  - id: p009_fig03
+    page: 9
+    plot_type: box_plot
+    bbox_pdf: [210.60, 176.62, 320.34, 269.94]
+    render_dpi: 200
+  - id: p009_fig04
+    page: 9
+    plot_type: box_plot
+    bbox_pdf: [95.40, 263.38, 205.60, 361.88]
+    render_dpi: 200
+  - id: p009_fig05
+    page: 9
+    plot_type: box_plot
+    bbox_pdf: [210.60, 269.13, 320.34, 361.88]
+    render_dpi: 200
+  - id: p009_fig06
+    page: 9
+    plot_type: box_plot
+    bbox_pdf: [95.40, 355.22, 205.60, 453.72]
+    render_dpi: 200
+  - id: p009_fig07
+    page: 9
+    plot_type: box_plot
+    bbox_pdf: [210.60, 362.13, 320.34, 453.72]
+    render_dpi: 200
+  - id: p010_fig01
+    page: 10
+    plot_type: box_plot
+    bbox_pdf: [92.67, 66.32, 164.16, 156.57]
+    render_dpi: 200
+  - id: p010_fig02
+    page: 10
+    plot_type: box_plot
+    bbox_pdf: [248.13, 78.18, 316.14, 156.57]
+    render_dpi: 200
+  - id: p010_fig03
+    page: 10
+    plot_type: box_plot
+    bbox_pdf: [92.29, 157.07, 205.60, 269.94]
+    render_dpi: 200
+  - id: p010_fig04
+    page: 10
+    plot_type: box_plot
+    bbox_pdf: [210.60, 176.62, 320.34, 269.94]
+    render_dpi: 200
+  - id: p010_fig05
+    page: 10
+    plot_type: box_plot
+    bbox_pdf: [95.40, 263.38, 205.60, 361.88]
+    render_dpi: 200
+  - id: p010_fig06
+    page: 10
+    plot_type: box_plot
+    bbox_pdf: [210.60, 269.13, 320.34, 361.88]
+    render_dpi: 200
+  - id: p010_fig07
+    page: 10
+    plot_type: box_plot
+    bbox_pdf: [95.40, 355.22, 205.60, 453.71]
+    render_dpi: 200
+  - id: p010_fig08
+    page: 10
+    plot_type: box_plot
+    bbox_pdf: [210.60, 362.13, 320.34, 453.71]
+    render_dpi: 200
+  - id: p011_fig01
+    page: 11
+    plot_type: box_plot
+    bbox_pdf: [92.71, 66.32, 159.96, 145.71]
+    render_dpi: 200
+  - id: p011_fig02
+    page: 11
+    plot_type: box_plot
+    bbox_pdf: [248.08, 78.18, 316.12, 156.55]
+    render_dpi: 200
+  - id: p011_fig03
+    page: 11
+    plot_type: box_plot
+    bbox_pdf: [92.29, 156.06, 205.63, 269.88]
+    render_dpi: 200
+  - id: p011_fig04
+    page: 11
+    plot_type: box_plot
+    bbox_pdf: [210.56, 176.59, 320.34, 269.88]
+    render_dpi: 200
+  - id: p011_fig05
+    page: 11
+    plot_type: box_plot
+    bbox_pdf: [95.40, 263.32, 205.63, 361.79]
+    render_dpi: 200
+  - id: p011_fig06
+    page: 11
+    plot_type: box_plot
+    bbox_pdf: [210.56, 269.06, 320.34, 361.79]
+    render_dpi: 200
+  - id: p011_fig07
+    page: 11
+    plot_type: box_plot
+    bbox_pdf: [95.40, 355.12, 205.63, 453.59]
+    render_dpi: 200
+  - id: p011_fig08
+    page: 11
+    plot_type: box_plot
+    bbox_pdf: [210.56, 362.04, 320.34, 453.59]
+    render_dpi: 200
+  - id: p012_fig01
+    page: 12
+    plot_type: box_plot
+    bbox_pdf: [66.42, 66.32, 346.62, 311.16]
+    render_dpi: 200
+  - id: p013_fig01
+    page: 13
+    plot_type: box_plot
+    bbox_pdf: [93.82, 66.32, 206.44, 158.21]
+    render_dpi: 200
+  - id: p013_fig02
+    page: 13
+    plot_type: box_plot
+    bbox_pdf: [207.66, 72.23, 318.87, 158.21]
+    render_dpi: 200

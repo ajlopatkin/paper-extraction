@@ -1,0 +1,94 @@
+# Paths are resolved relative to the repository root (parent of config/).
+pdf:
+  path: data/paper.pdf
+
+artifacts:
+  figures_dir: artifacts/figures
+  extractions_dir: artifacts/extractions
+
+# Set page (1-based) and either bbox_pdf (PDF points) or bbox_norm (0–1 fractions of page).
+# Replace placeholders after running: python tools/preview_page.py data/paper.pdf --page N --out artifacts/page_preview.png
+figures:
+  # Example: table printed as a figure panel (set bbox and plot_type yourself or via discover + edit)
+  # - id: table_s1
+  #   page: 3
+  #   plot_type: table_image
+  #   bbox_norm: [0.1, 0.2, 0.9, 0.6]
+  #   render_dpi: 200
+  - id: fig_3a
+    page: 8
+    plot_type: box_plot
+    bbox_norm: [0.125, 0.075, 0.6, 0.25]
+    render_dpi: 150
+  - id: fig_3b
+    page: 8
+    plot_type: box_plot
+    bbox_norm: [0.125, 0.26, 0.6, 0.425]
+    render_dpi: 150
+  - id: fig_4
+    page: 8
+    plot_type: line_chart
+    bbox_norm: [0.15, 0.7, 0.55, 0.85]
+    render_dpi: 150
+
+# Optional: skip vision/crop for known decorative regions (ids from discover-bboxes, etc.)
+# exclude_figure_ids:
+#   - p004_fig03
+
+vision:
+  provider: anthropic  # optional; defaults to env PAPER_ANALYSIS_VISION_PROVIDER or anthropic
+  model: null         # optional; defaults to ANTHROPIC_MODEL / OPENAI_MODEL
+
+# Optional: auto bboxes from embedded images (omit or set enabled: false to use manual `figures` only).
+auto_discover:
+  enabled: true
+  strategy: only_auto   # only_auto | append_to_manual
+  default_plot_type: box_plot
+  pages: null           # null = all pages, or e.g. [1, 2, 8]
+  min_area_frac: 0.008
+  min_width_frac: 0.03
+  min_height_frac: 0.03
+  duplicate_merge_iou: 0.82
+  merge_fragments: false
+  merge_iou_threshold: 0.28
+  include_vector_graphics: true
+  drawing_cluster_gap_frac: 0.012
+  padding_frac: 0.01
+  max_figures_per_page: null
+  id_template: "p{page:03d}_fig{index:02d}"
+  render_dpi: 200
+
+# Text + native PDF tables (complementary to figure vision pipeline).
+text:
+  output_dir: artifacts/text
+  pages: null              # null = all pages
+  max_context_chars: 120000
+  llm_model: null           # optional; defaults to vision.model / env
+
+# Spreadsheet export: vision JSON + optional text candidates + native table cells (see README).
+export:
+  output_path: artifacts/export/extractions.xlsx
+  include_native_pdf_tables: true
+
+evaluation:
+  spreadsheet_path: data/ground_truth.xlsx
+  sheet: Measurements
+  source_column: Source_in_paper
+  relative_tolerance: 0.10
+  absolute_tolerance: 0.01
+  comparisons:
+    - figure_id: fig_3a
+      source_contains: "Fig. 3A"
+      label_column: Field_name
+      value_column: Raw_value
+      strip_tilde: true
+    - figure_id: fig_3b
+      source_contains: "Fig. 3B"
+      label_column: Field_name
+      value_column: Raw_value
+      strip_tilde: true
+    - figure_id: fig_4
+      source_contains: "Fig. 4"
+      label_column: Field_name
+      value_column: Raw_value
+      strip_tilde: true
