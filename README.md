@@ -20,7 +20,7 @@ cp .env.example .env   # set ANTHROPIC_API_KEY and/or OPENAI_API_KEY
 # 3. Create a minimal batch config (or add to existing batch.yaml)
 #    Papers not listed in paper_map auto-derive an ID from the filename.
 
-# 4. Run the full pipeline
+# 4. Run the full pipeline (sequential mode — good for small batches)
 paper-analysis batch-run -c config/batch.yaml
 
 # 5. Post-process (no API calls — expands vision data, filters false positives)
@@ -42,6 +42,23 @@ You can also process a single new paper without touching the batch config:
 paper-analysis batch-run -c config/batch.yaml -p NewPaper_2025
 paper-analysis batch-postprocess -c config/batch.yaml -p NewPaper_2025
 ```
+
+### Large-Scale Processing (Batch API Mode)
+
+For processing hundreds to hundreds of thousands of papers, use `--batch-api` to leverage the Anthropic Message Batches API. This provides **50% cost reduction**, **prompt caching** (90% savings on the static instruction prefix), and **two-tier model routing** (cheap model for simple papers, premium for complex ones).
+
+```bash
+# Run with batch API — all API calls submitted asynchronously
+paper-analysis batch-run -c config/batch.yaml --batch-api
+
+# Resume an interrupted batch run
+paper-analysis batch-run -c config/batch.yaml --batch-api --resume
+
+# Check status of active batches
+paper-analysis batch-status -c config/batch.yaml
+```
+
+At scale, batch API mode reduces cost from ~$0.90/paper to ~$0.06/paper (a ~15x reduction), enabling 100K-paper runs for ~$6K instead of ~$90K. See [Batch API Mode](#batch-api-mode) for details.
 
 ### Adding New Papers to an Existing Batch
 
@@ -75,6 +92,8 @@ For each paper, `batch-run` executes five stages:
 
 The final output is `artifacts/<Paper_ID>/text/candidate_combined.json` — a flat table where every measurement row carries full experimental context (strain, plasmid, conditions, etc.).
 
+In **sequential mode** (default), each paper processes one at a time with synchronous API calls. In **batch API mode** (`--batch-api`), local prep runs for all papers first, then all API calls are submitted as Anthropic Message Batches for asynchronous processing at 50% reduced cost.
+
 ### Post-Processing Details
 
 `batch-postprocess` runs three zero-API-cost steps on existing artifacts:
@@ -104,11 +123,12 @@ paper-analysis/
 │       ├── figures/                        # Cropped figure PNGs
 │       └── extractions/                    # Per-figure vision JSONs
 ├── src/paper_analysis/
-│   ├── batch.py                 # Batch orchestration
+│   ├── batch.py                 # Batch orchestration (sequential + batch API)
+│   ├── batch_api.py             # Anthropic Message Batches API wrapper
 │   ├── batch_evaluate.py        # Evaluation + synonym mapping
 │   ├── postprocess.py           # Post-processing + MFL filter
 │   ├── combined_prompts.py      # LLM extraction prompts
-│   ├── combined_analyze_llm.py  # LLM API calls
+│   ├── combined_analyze_llm.py  # LLM API calls + batch request builders
 │   ├── cli.py                   # All CLI commands
 │   └── vision/                  # Vision model clients
 └── PROMPT_ITERATION_LOG.md      # Iteration history + metrics
@@ -156,6 +176,30 @@ auto_discover:
   default_plot_type: auto
 ```
 
+### Two-Tier Model Config (for `--batch-api` mode)
+
+The `tier` section controls model routing when using `--batch-api`. Papers are assigned to a cheap or premium model based on heuristics and explicit overrides:
+
+```yaml
+tier:
+  default_tier: cheap                       # "cheap" or "premium"
+  cheap_model: claude-haiku-4-5             # fast, low-cost model
+  premium_model: claude-sonnet-4-20250514   # higher accuracy for complex papers
+
+  # Explicit per-paper overrides (take priority over auto rules)
+  premium_papers: []          # paper IDs forced to premium
+  cheap_papers: []            # paper IDs forced to cheap (even if auto rules say premium)
+
+  # Automatic routing heuristics
+  auto_tier_rules:
+    enabled: true
+    page_threshold: 30        # papers with >30 pages → premium
+    figure_threshold: 20      # papers with >20 figures → premium
+    scanned_text_ratio: 0.3   # >30% of pages lack native tables → premium
+```
+
+The routing priority is: explicit `cheap_papers` > explicit `premium_papers` > auto heuristics > `default_tier`.
+
 ### Environment Variables
 
 Set in `.env`:
@@ -178,6 +222,18 @@ paper-analysis batch-run -c config/batch.yaml -p Smith_2024 -p Jones_2023
 
 # Skip vision (text-only extraction, no figure processing)
 paper-analysis batch-run -c config/batch.yaml --skip-vision
+
+# Batch API mode (50% cost savings, async, prompt caching, tiered models)
+paper-analysis batch-run -c config/batch.yaml --batch-api
+
+# Resume an interrupted batch API run
+paper-analysis batch-run -c config/batch.yaml --batch-api --resume
+
+# Custom poll interval (default 30s)
+paper-analysis batch-run -c config/batch.yaml --batch-api --poll-interval 60
+
+# Check status of active batch API runs
+paper-analysis batch-status -c config/batch.yaml
 
 # Post-process only (no API calls, runs on existing artifacts)
 paper-analysis batch-postprocess -c config/batch.yaml
@@ -292,6 +348,50 @@ Zero-API-cost steps that run on existing artifacts:
 3. Master Field List whitelist filter (removes false positives)
 
 Each step is idempotent. Original LLM output is preserved in `.bak` files.
+
+## Batch API Mode
+
+The `--batch-api` flag switches from sequential (one paper at a time) to asynchronous batch processing using the [Anthropic Message Batches API](https://docs.anthropic.com/en/docs/build-with-claude/message-batches). This combines three cost optimizations:
+
+### How It Works
+
+The pipeline runs in four phases:
+
+1. **Local prep** — Extract text, discover figures, and crop PNGs for all papers. No API calls.
+2. **Vision batch** — Submit all figure classification requests as a batch, wait for results, then submit all extraction requests as a second batch.
+3. **Combined extraction batch** — Submit all combined extraction requests as a single batch with prompt caching and tier-based model selection. Automatically handles truncated outputs with continuation batches.
+4. **Post-processing** — Expand vision data and apply MFL filtering. No API calls.
+
+### Cost Savings
+
+| Optimization | Savings | How |
+|-------------|---------|-----|
+| Batch API | 50% | Anthropic charges half price for async batch processing |
+| Prompt caching | ~90% on static prefix | The ~4K-token instruction prompt is identical across all papers; with 1-hour TTL cache, subsequent reads cost 0.1x base price |
+| Tier routing | ~3-5x on simple papers | Haiku 4.5 is ~3x cheaper than Sonnet 4; most papers don't need the premium model |
+
+**Estimated cost at scale:**
+
+| Scale | Sequential (Sonnet 4) | Batch API (tiered) |
+|-------|----------------------|-------------------|
+| 20 papers | ~$18 | ~$1.20 |
+| 1,000 papers | ~$900 | ~$60 |
+| 100,000 papers | ~$90,000 | ~$6,000 |
+
+### Resume Support
+
+Batch state is persisted to `artifacts/_batch_state/` so interrupted runs can be resumed:
+
+```bash
+# If a run is interrupted (Ctrl-C, network error, etc.)
+paper-analysis batch-run -c config/batch.yaml --batch-api --resume
+```
+
+The `batch-status` command shows the state of all active batches without modifying anything:
+
+```bash
+paper-analysis batch-status -c config/batch.yaml
+```
 
 ## Outputs
 

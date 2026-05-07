@@ -60,3 +60,17 @@ auto_discover:
   render_dpi: 200
 
 max_context_chars: 120000
+
+# Two-tier model routing for batch API mode.
+# Papers are routed to cheap or premium models based on heuristics + overrides.
+tier:
+  default_tier: cheap
+  cheap_model: claude-haiku-4-5
+  premium_model: claude-sonnet-4-20250514
+  premium_papers: []          # paper IDs to force onto the premium tier
+  cheap_papers: []            # paper IDs to force onto the cheap tier
+  auto_tier_rules:
+    enabled: true
+    page_threshold: 30        # >30 pages → premium
+    figure_threshold: 20      # >20 figures → premium
+    scanned_text_ratio: 0.3   # >30% pages without native tables → premium

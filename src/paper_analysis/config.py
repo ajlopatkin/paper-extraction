@@ -218,6 +218,48 @@ class PocConfig(BaseModel):
         return cls.model_validate(_resolve_paths(raw, project_root))
 
 
+class AutoTierRules(BaseModel):
+    """Heuristics for automatically routing papers to the premium tier."""
+
+    enabled: bool = True
+    page_threshold: int = Field(
+        default=30,
+        ge=1,
+        description="Papers with more pages than this are routed to the premium tier.",
+    )
+    figure_threshold: int = Field(
+        default=20,
+        ge=1,
+        description="Papers with more discovered figures than this are routed to the premium tier.",
+    )
+    scanned_text_ratio: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "If more than this fraction of pages have no native tables, "
+            "treat as scanned/OCR and route to premium."
+        ),
+    )
+
+
+class TierConfig(BaseModel):
+    """Two-tier model routing: cheap default with premium fallback for complex papers."""
+
+    default_tier: Literal["cheap", "premium"] = "cheap"
+    cheap_model: str = "claude-haiku-4-5"
+    premium_model: str = "claude-sonnet-4-20250514"
+    premium_papers: list[str] = Field(
+        default_factory=list,
+        description="Paper IDs explicitly assigned to the premium tier (overrides auto rules).",
+    )
+    cheap_papers: list[str] = Field(
+        default_factory=list,
+        description="Paper IDs explicitly forced to the cheap tier (overrides auto rules).",
+    )
+    auto_tier_rules: AutoTierRules = Field(default_factory=AutoTierRules)
+
+
 class PaperEntry(BaseModel):
     """Maps a PDF filename to its ground-truth Paper_ID."""
 
@@ -247,6 +289,7 @@ class BatchConfig(BaseModel):
     )
     text: TextPipelineConfig | None = None
     export: ExportConfig | None = None
+    tier: TierConfig = Field(default_factory=TierConfig)
 
     max_context_chars: int = Field(default=120000, ge=8000, le=500000)
 
@@ -264,6 +307,34 @@ class BatchConfig(BaseModel):
                 return entry.paper_id
         stem = Path(pdf_filename).stem
         return stem
+
+    def model_for_paper(
+        self,
+        paper_id: str,
+        *,
+        n_pages: int = 0,
+        n_figures: int = 0,
+        n_pages_with_tables: int = 0,
+    ) -> str:
+        """Return the model name for a paper based on tier config and auto-heuristics."""
+        tc = self.tier
+        if paper_id in tc.cheap_papers:
+            return tc.cheap_model
+        if paper_id in tc.premium_papers:
+            return tc.premium_model
+
+        if tc.auto_tier_rules.enabled and n_pages > 0:
+            rules = tc.auto_tier_rules
+            if n_pages > rules.page_threshold:
+                return tc.premium_model
+            if n_figures > rules.figure_threshold:
+                return tc.premium_model
+            if n_pages > 0 and n_pages_with_tables > 0:
+                table_ratio = n_pages_with_tables / n_pages
+                if (1.0 - table_ratio) > rules.scanned_text_ratio:
+                    return tc.premium_model
+
+        return tc.cheap_model if tc.default_tier == "cheap" else tc.premium_model
 
     def poc_config_for_paper(self, pdf_path: Path, paper_id: str) -> PocConfig:
         """Build a single-paper PocConfig with per-paper artifact dirs."""

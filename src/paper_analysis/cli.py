@@ -343,17 +343,98 @@ def batch_run_cmd(
         "--skip-vision",
         help="Skip figure discovery/extraction/vision (text-only combined extraction).",
     ),
+    batch_api: bool = typer.Option(
+        False,
+        "--batch-api",
+        help=(
+            "Use the Anthropic Message Batches API (50%% cost reduction, async). "
+            "Enables prompt caching and two-tier model routing from the tier config."
+        ),
+    ),
+    resume: bool = typer.Option(
+        False,
+        "--resume",
+        help="Resume an interrupted --batch-api run from saved batch state.",
+    ),
+    poll_interval: float = typer.Option(
+        30.0,
+        "--poll-interval",
+        help="Seconds between batch status polls (--batch-api mode only).",
+    ),
 ) -> None:
-    """Run the full pipeline on all papers in the batch config."""
-    from paper_analysis.batch import run_batch
+    """Run the full pipeline on all papers in the batch config.
+
+    Default mode processes papers sequentially with synchronous API calls.
+    Use --batch-api for async batch processing with 50%% cost savings.
+    """
+    batch_cfg = BatchConfig.load(config.resolve())
+
+    if batch_api:
+        from paper_analysis.batch import run_batch_api
+
+        run_batch_api(
+            batch_cfg,
+            papers=papers or None,
+            skip_vision=skip_vision,
+            resume=resume,
+            poll_interval=poll_interval,
+            echo=typer.echo,
+        )
+    else:
+        if resume:
+            typer.echo("--resume requires --batch-api", err=True)
+            raise typer.Exit(1)
+        from paper_analysis.batch import run_batch
+
+        run_batch(
+            batch_cfg,
+            papers=papers or None,
+            skip_vision=skip_vision,
+            echo=typer.echo,
+        )
+
+
+@app.command("batch-status")
+def batch_status_cmd(
+    config: Path = typer.Option(
+        Path("config/batch.yaml"), "--config", "-c", exists=True
+    ),
+) -> None:
+    """Show the status of active Anthropic batch API runs."""
+    import anthropic as _anthropic
+
+    from paper_analysis.batch_api import BatchState
 
     batch_cfg = BatchConfig.load(config.resolve())
-    run_batch(
-        batch_cfg,
-        papers=papers or None,
-        skip_vision=skip_vision,
-        echo=typer.echo,
-    )
+    state_dir = batch_cfg.artifacts_dir / "_batch_state"
+
+    if not state_dir.is_dir():
+        typer.echo("No batch state found. Run batch-run --batch-api first.")
+        raise typer.Exit(0)
+
+    state_files = sorted(state_dir.glob("*_state.json"))
+    if not state_files:
+        typer.echo("No batch state files found.")
+        raise typer.Exit(0)
+
+    client = _anthropic.Anthropic()
+    for sf in state_files:
+        state = BatchState.load(sf)
+        phase = state.phase or sf.stem
+        typer.echo(f"\n--- {phase} ---")
+        typer.echo(f"  State file: {sf}")
+        typer.echo(f"  Completed: {state.completed}")
+        for bid in state.batch_ids:
+            try:
+                batch = client.messages.batches.retrieve(bid)
+                counts = batch.request_counts
+                typer.echo(
+                    f"  Batch {bid}: {batch.processing_status} "
+                    f"(succeeded={counts.succeeded}, errored={counts.errored}, "
+                    f"expired={counts.expired}, processing={counts.processing})"
+                )
+            except Exception as exc:
+                typer.echo(f"  Batch {bid}: error retrieving status ({exc})")
 
 
 @app.command("batch-postprocess")

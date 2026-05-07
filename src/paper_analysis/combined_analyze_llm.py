@@ -295,3 +295,127 @@ def run_combined_analysis(
     if prov == "openai":
         return run_combined_analysis_openai(user_content, model=model, max_retries=max_retries)
     raise ValueError(f"Unknown combined LLM provider: {provider!r}")
+
+
+# ---------------------------------------------------------------------------
+# Batch API request builders (Anthropic Message Batches with prompt caching)
+# ---------------------------------------------------------------------------
+
+_CACHE_CONTROL_1H = {"type": "ephemeral", "ttl": "1h"}
+
+
+def build_combined_batch_request(
+    paper_id: str,
+    user_content: str,
+    model: str,
+) -> dict:
+    """Build a single Anthropic batch request dict for combined extraction.
+
+    Uses structured content blocks so that the static system + instruction
+    prefix can be cached across all papers in the batch (1h TTL).
+    """
+    return {
+        "custom_id": f"{paper_id}__combined",
+        "params": {
+            "model": model,
+            "max_tokens": _MAX_TOKENS,
+            "temperature": 0.1,
+            "system": [
+                {
+                    "type": "text",
+                    "text": COMBINED_SYSTEM,
+                    "cache_control": _CACHE_CONTROL_1H,
+                },
+            ],
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": COMBINED_USER,
+                            "cache_control": _CACHE_CONTROL_1H,
+                        },
+                        {
+                            "type": "text",
+                            "text": "\n\n--- INPUT ---\n\n" + user_content,
+                        },
+                    ],
+                }
+            ],
+        },
+    }
+
+
+def build_continuation_batch_request(
+    paper_id: str,
+    user_content: str,
+    model: str,
+    extracted_ids: list[str],
+    pass_num: int,
+) -> dict | None:
+    """Build a continuation batch request for a paper whose output was truncated."""
+    if not extracted_ids:
+        return None
+    last_id = extracted_ids[-1]
+    last_num = 0
+    for eid in extracted_ids:
+        try:
+            last_num = max(last_num, int(eid.replace("MEAS_", "")))
+        except ValueError:
+            pass
+    next_id = f"MEAS_{last_num + 1:03d}"
+
+    cont_msg = _CONTINUATION_PROMPT.format(
+        extracted_ids=", ".join(extracted_ids),
+        last_id=last_id,
+        next_id=next_id,
+        content=user_content,
+    )
+
+    return {
+        "custom_id": f"{paper_id}__continuation_{pass_num}",
+        "params": {
+            "model": model,
+            "max_tokens": _MAX_TOKENS,
+            "temperature": 0.1,
+            "system": [
+                {
+                    "type": "text",
+                    "text": COMBINED_SYSTEM,
+                    "cache_control": _CACHE_CONTROL_1H,
+                },
+            ],
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": cont_msg,
+                        },
+                    ],
+                }
+            ],
+        },
+    }
+
+
+def parse_batch_result_text(
+    text: str,
+    stop_reason: str | None = None,
+) -> tuple[CombinedExtractionBatch | None, bool]:
+    """Parse a batch result into a CombinedExtractionBatch.
+
+    Returns (batch_or_none, needs_continuation).
+    needs_continuation is True when the output appears truncated.
+    """
+    try:
+        batch = parse_combined_extraction_batch(text)
+        return batch, False
+    except (json.JSONDecodeError, ValueError, ValidationError):
+        salvaged = _salvage_truncated_json(text)
+        if salvaged is not None and salvaged.candidates:
+            needs_cont = stop_reason == "max_tokens"
+            return salvaged, needs_cont
+        return None, False

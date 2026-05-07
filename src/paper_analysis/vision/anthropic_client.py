@@ -3,6 +3,8 @@ from __future__ import annotations
 import base64
 import json
 import os
+from typing import Any
+
 import anthropic
 from pydantic import ValidationError
 
@@ -93,3 +95,78 @@ class AnthropicVisionClient:
                 if attempt >= attempts - 1:
                     raise
         raise RuntimeError(f"extraction failed: {last_err}")
+
+
+# ---------------------------------------------------------------------------
+# Batch API request builders
+# ---------------------------------------------------------------------------
+
+def _make_image_block(image_b64: str) -> dict[str, Any]:
+    return {
+        "type": "image",
+        "source": {"type": "base64", "media_type": "image/png", "data": image_b64},
+    }
+
+
+def build_classify_batch_request(
+    custom_id: str,
+    image_b64: str,
+    model: str,
+) -> dict[str, Any]:
+    """Build a batch request dict for figure classification."""
+    system, user_text = classify_prompts()
+    return {
+        "custom_id": custom_id,
+        "params": {
+            "model": model,
+            "max_tokens": 64,
+            "system": system,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        _make_image_block(image_b64),
+                        {"type": "text", "text": user_text},
+                    ],
+                }
+            ],
+        },
+    }
+
+
+def build_extract_batch_request(
+    custom_id: str,
+    image_b64: str,
+    plot_type: str,
+    model: str,
+) -> dict[str, Any]:
+    """Build a batch request dict for figure data extraction."""
+    system, user_text = _prompts_for(plot_type)
+    return {
+        "custom_id": custom_id,
+        "params": {
+            "model": model,
+            "max_tokens": 16384,
+            "system": system,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        _make_image_block(image_b64),
+                        {"type": "text", "text": user_text},
+                    ],
+                }
+            ],
+        },
+    }
+
+
+def parse_classify_result(text: str) -> str:
+    """Parse a classification batch result into a plot_type string."""
+    raw = text.strip().lower().replace(" ", "_")
+    if raw in _VALID_PLOT_TYPES:
+        return raw
+    for valid in _VALID_PLOT_TYPES:
+        if valid in raw:
+            return valid
+    return "table_image"
