@@ -1,6 +1,6 @@
 # paper-analysis
 
-Automated extraction of structured experimental data from scientific papers about plasmid biology, horizontal gene transfer, and bacterial genetics. Processes PDFs end-to-end: text extraction, figure discovery, vision-model analysis, LLM-based measurement extraction, and post-processing — producing denormalized tables of experimental measurements with full run metadata.
+Automated extraction of structured experimental data from scientific papers about plasmid features, horizontal gene transfer, and bacterial genetics. Processes PDFs end-to-end: text extraction, figure discovery, vision-model analysis, LLM-based measurement extraction, and post-processing — producing denormalized tables of experimental measurements with full run metadata.
 
 ## Quick Start
 
